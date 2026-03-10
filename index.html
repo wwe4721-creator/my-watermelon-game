@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>수원산의 수박게임 - 과일 이미지 복구 & 가이드</title>
+    <style>
+        body { margin: 0; background: #333; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Arial', sans-serif; overflow: hidden; }
+        #game-container { position: relative; width: 400px; height: 600px; }
+        #score { position: absolute; top: 20px; left: 20px; color: #fff; font-size: 30px; font-weight: bold; z-index: 10; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        canvas { border: 5px solid #fff; border-radius: 15px; background: #fff9c4; cursor: none; } /* 마우스 커서 숨김 */
+        
+        /* 가이드 라인 스타일 */
+        #guide-line { position: absolute; top: 0; width: 2px; height: 100%; border-left: 2px dashed rgba(255,255,255,0.7); pointer-events: none; visibility: hidden; z-index: 5; }
+        #guide-fruit { position: absolute; top: 50px; transform: translate(-50%, -50%); pointer-events: none; visibility: hidden; z-index: 6; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="score">Score: 0</div>
+        <div id="guide-line"></div>
+        <div id="guide-fruit"></div> </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script>
+        const { Engine, Render, Runner, Bodies, Composite, Events } = Matter;
+        const engine = Engine.create();
+        const render = Render.create({
+            element: document.getElementById('game-container'),
+            engine: engine,
+            options: { width: 400, height: 600, wireframes: false, background: '#fff9c4' }
+        });
+
+        let score = 0;
+        let isGameOver = false;
+        const gameContainer = document.getElementById('game-container');
+        const guideLine = document.getElementById('guide-line');
+        const guideFruitDiv = document.getElementById('guide-fruit');
+
+        // 1. 과일 데이터 (색상, 테두리 등을 이용해 과일처럼 보이게 함)
+        const FRUITS = [
+            { radius: 15, score: 10, color: '#ff5252', border: '#b71c1c', name: '체리' }, // 체리
+            { radius: 25, score: 20, color: '#ff80ab', border: '#c2185b', name: '딸기' }, // 딸기
+            { radius: 35, score: 40, color: '#ba68c8', border: '#7b1fa2', name: '포도' }, // 포도
+            { radius: 45, score: 80, color: '#fff176', border: '#fbc02d', name: '레몬' }, // 레몬
+            { radius: 55, score: 160, color: '#ffb74d', border: '#e65100', name: '오렌지' },// 오렌지
+            { radius: 70, score: 320, color: '#ef5350', border: '#b71c1c', name: '사과' },  // 사과
+            { radius: 85, score: 640, color: '#81c784', border: '#1b5e20', name: '수박' }  // 수박
+        ];
+
+        // 벽과 바닥
+        const ground = Bodies.rectangle(200, 590, 400, 20, { isStatic: true, render: { fillStyle: '#fff' } });
+        const leftWall = Bodies.rectangle(5, 300, 10, 600, { isStatic: true, render: { fillStyle: '#fff' } });
+        const rightWall = Bodies.rectangle(395, 300, 10, 600, { isStatic: true, render: { fillStyle: '#fff' } });
+        Composite.add(engine.world, [ground, leftWall, rightWall]);
+
+        // 2. 가이드 기능 (마우스 움직임 추적)
+        gameContainer.addEventListener("mousemove", (e) => {
+            if (isGameOver) return;
+            const rect = render.canvas.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            
+            // X좌표 제한
+            if (x < 30) x = 30; if (x > 370) x = 370;
+
+            // 가이드 라인 위치 변경
+            guideLine.style.left = x + 'px';
+            guideLine.style.visibility = 'visible';
+            
+            // 생성될 과일 미리보기 (체리 고정)
+            const nextFruit = FRUITS[0];
+            guideFruitDiv.style.left = x + 'px';
+            guideFruitDiv.style.width = nextFruit.radius * 2 + 'px';
+            guideFruitDiv.style.height = nextFruit.radius * 2 + 'px';
+            guideFruitDiv.style.backgroundColor = nextFruit.color;
+            guideFruitDiv.style.border = `2px solid ${nextFruit.border}`;
+            guideFruitDiv.style.visibility = 'visible';
+        });
+
+        // 마우스가 화면 나가면 가이드 숨김
+        gameContainer.addEventListener("mouseleave", () => {
+            guideLine.style.visibility = 'hidden';
+            guideFruitDiv.style.visibility = 'hidden';
+        });
+
+        // 클릭 이벤트 (과일 투하)
+        window.addEventListener("mousedown", (e) => {
+            if (isGameOver) return;
+
+            const rect = render.canvas.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            if (x < 30) x = 30; if (x > 370) x = 370;
+
+            const index = 0; // 지금은 가이드에 맞게 체리만 생성
+            const fruit = FRUITS[index];
+            
+            const newFruit = Bodies.circle(x, 50, fruit.radius, {
+                index: index,
+                restitution: 0.3,
+                friction: 0.1,
+                render: {
+                    fillStyle: fruit.color,
+                    strokeStyle: fruit.border, // 테두리 추가
+                    lineWidth: 3
+                }
+            });
+            Composite.add(engine.world, newFruit);
+        });
+
+        // 충돌 및 합체 로직
+        Events.on(engine, 'collisionStart', (event) => {
+            event.pairs.forEach((collision) => {
+                const { bodyA, bodyB } = collision;
+
+                // 같은 레벨의 과일이 부딪혔는지 확인
+                if (bodyA.index === bodyB.index && bodyA.index !== undefined && bodyA.index < FRUITS.length - 1) {
+                    const nextIndex = bodyA.index + 1;
+                    const nextFruit = FRUITS[nextIndex];
+                    const midX = (bodyA.position.x + bodyB.position.x) / 2;
+                    const midY = (bodyA.position.y + bodyB.position.y) / 2;
+
+                    Composite.remove(engine.world, [bodyA, bodyB]);
+
+                    // 점수 올리기
+                    score += FRUITS[nextIndex].score;
+                    document.getElementById('score').innerText = `Score: ${score}`;
+
+                    // 다음 레벨 과일 생성
+                    const newFruit = Bodies.circle(midX, midY, nextFruit.radius, {
+                        index: nextIndex,
+                        render: {
+                            fillStyle: nextFruit.color,
+                            strokeStyle: nextFruit.border,
+                            lineWidth: 3
+                        }
+                    });
+                    Composite.add(engine.world, newFruit);
+                }
+            });
+        });
+
+        // 게임 오버 체크
+        Events.on(engine, 'afterUpdate', () => {
+            if (isGameOver) return;
+
+            Composite.allBodies(engine.world).forEach(body => {
+                if (!body.isStatic && body.position.y < 100 && body.velocity.y < 0.1) {
+                    isGameOver = true;
+                    // 가이드 숨김
+                    guideLine.style.visibility = 'hidden';
+                    guideFruitDiv.style.visibility = 'hidden';
+                    alert(`게임 오버! 최종 점수: ${score}`);
+                    location.reload();
+                }
+            });
+        });
+
+        Render.run(render);
+        Runner.run(Runner.create(), engine);
+    </script>
+</body>
+</html>
