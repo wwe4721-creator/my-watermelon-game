@@ -1,160 +1,217 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>수원산의 수박게임 - 과일 이미지 복구 & 가이드</title>
+    <title>모펀치두가자</title>
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #333; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Arial', sans-serif; overflow: hidden; }
-        #game-container { position: relative; width: 400px; height: 600px; }
-        #score { position: absolute; top: 20px; left: 20px; color: #fff; font-size: 30px; font-weight: bold; z-index: 10; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        canvas { border: 5px solid #fff; border-radius: 15px; background: #fff9c4; cursor: none; } /* 마우스 커서 숨김 */
+        body { 
+            margin: 0; 
+            /* 🔵 약간 푸른색 배경 */
+            background: #e1f5fe; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden; 
+            /* 🔠 귀여운 글꼴 적용 */
+            font-family: 'Gaegu', cursive; 
+            position: relative; /* 배경 과일을 위한 설정 */
+        }
+
+        /* 🍓 배경에 듬성듬성 떠다니는 과일 스타일 */
+        .background-fruit {
+            position: absolute;
+            color: rgba(255, 255, 255, 0.4); /* 약간 투명하게 */
+            font-size: 40px;
+            pointer-events: none; /* 클릭 안되게 */
+            z-index: -1; /* 게임 화면 뒤로 */
+        }
+
+        #game-container { 
+            position: relative; 
+            width: 400px; 
+            height: 600px; 
+            /* 🎨 게임 영역 배경 (하얀색 유지) */
+            background: #ffffff; 
+            border: 10px solid #5d4037; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden; /* 가이드 라인이 넘치지 않게 */
+        }
         
-        /* 가이드 라인 스타일 */
-        #guide-line { position: absolute; top: 0; width: 2px; height: 100%; border-left: 2px dashed rgba(255,255,255,0.7); pointer-events: none; visibility: hidden; z-index: 5; }
-        #guide-fruit { position: absolute; top: 50px; transform: translate(-50%, -50%); pointer-events: none; visibility: hidden; z-index: 6; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+        #game-title { 
+            position: absolute; 
+            /* 🔧 수정 완료: -60px에서 15px로 변경하여 화면 안으로 불러왔습니다. */
+            top: 15px; 
+            width: 100%; 
+            text-align: center; 
+            color: #5d4037; 
+            font-size: 48px; 
+            font-weight: bold; 
+            letter-spacing: 2px; 
+            text-shadow: 2px 2px 0 #fff;
+            /* 🔧 추가: 과일보다 앞쪽에 보이도록 설정 */
+            z-index: 10; 
+        }
+        
+        #score-board { 
+            position: absolute; 
+            /* 🔧 수정 완료: 제목과 겹치지 않게 20px에서 80px로 내렸습니다. */
+            top: 80px; 
+            left: 20px; 
+            font-size: 28px; /* 🔧 글자 크기 살짝 조정 */
+            font-weight: bold; 
+            color: #5d4037; 
+            z-index: 100; 
+            pointer-events: none; 
+            background: rgba(255,255,255,0.7);
+            padding: 5px 15px;
+            border-radius: 15px;
+        }
+        canvas { display: block; border-radius: 10px; }
+        #guide-line { 
+            position: absolute; 
+            top: 0; 
+            width: 2px; 
+            height: 100%; 
+            border-left: 2px dashed rgba(93, 64, 55, 0.2); 
+            pointer-events: none; 
+            z-index: 5; 
+            left: 50%; /* 초기 위치 */
+        }
     </style>
 </head>
 <body>
+    <div id="bg-fruits-container"></div>
+
     <div id="game-container">
-        <div id="score">Score: 0</div>
+        <div id="game-title">모펀치두가자</div>
+        <div id="score-board">펀치력: <span id="score">0</span></div>
         <div id="guide-line"></div>
-        <div id="guide-fruit"></div> </div>
+        <audio id="bgm" src="모선녀.m4a" loop></audio>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script>
         const { Engine, Render, Runner, Bodies, Composite, Events } = Matter;
+
+        // 1. 🍓 배경 랜덤 과일 생성 스크립트
+        const bgFruitsContainer = document.getElementById('bg-fruits-container');
+        const fruitEmojis = ['🍒', '🍓', '🍇', '🍋', '🍊', '🍎', '🍉'];
+        const numBgFruits = 15; // 배경 과일 개수
+
+        for (let i = 0; i < numBgFruits; i++) {
+            const fruit = document.createElement('div');
+            fruit.className = 'background-fruit';
+            fruit.innerText = fruitEmojis[Math.floor(Math.random() * fruitEmojis.length)];
+            
+            // 랜덤 위치
+            fruit.style.left = Math.random() * 100 + 'vw';
+            fruit.style.top = Math.random() * 100 + 'vh';
+            
+            // 랜덤 크기
+            fruit.style.fontSize = (Math.random() * 30 + 20) + 'px';
+            
+            // 랜덤 회전
+            fruit.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+            bgFruitsContainer.appendChild(fruit);
+        }
+
+        // 2. 물리 엔진 및 게임 로직
         const engine = Engine.create();
+        engine.timing.timeScale = 0.5; // 느린 속도 유지
+
         const render = Render.create({
             element: document.getElementById('game-container'),
             engine: engine,
-            options: { width: 400, height: 600, wireframes: false, background: '#fff9c4' }
+            options: { 
+                width: 400, 
+                height: 600, 
+                wireframes: false, 
+                background: 'transparent' // CSS 배경을 사용하기 위해 투명으로 설정
+            }
         });
 
-        let score = 0;
-        let isGameOver = false;
-        const gameContainer = document.getElementById('game-container');
-        const guideLine = document.getElementById('guide-line');
-        const guideFruitDiv = document.getElementById('guide-fruit');
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+        Render.run(render);
 
-        // 1. 과일 데이터 (색상, 테두리 등을 이용해 과일처럼 보이게 함)
         const FRUITS = [
-            { radius: 15, score: 10, color: '#ff5252', border: '#b71c1c', name: '체리' }, // 체리
-            { radius: 25, score: 20, color: '#ff80ab', border: '#c2185b', name: '딸기' }, // 딸기
-            { radius: 35, score: 40, color: '#ba68c8', border: '#7b1fa2', name: '포도' }, // 포도
-            { radius: 45, score: 80, color: '#fff176', border: '#fbc02d', name: '레몬' }, // 레몬
-            { radius: 55, score: 160, color: '#ffb74d', border: '#e65100', name: '오렌지' },// 오렌지
-            { radius: 70, score: 320, color: '#ef5350', border: '#b71c1c', name: '사과' },  // 사과
-            { radius: 85, score: 640, color: '#81c784', border: '#1b5e20', name: '수박' }  // 수박
+            { radius: 20, score: 10, color: '#ff5252', img: "fruit0.png" },
+            { radius: 30, score: 20, color: '#ff80ab', img: "fruit1.png" },
+            { radius: 40, score: 40, color: '#ba68c8', img: "fruit2.png" },
+            { radius: 50, score: 80, color: '#fff176', img: "fruit3.png" },
+            { radius: 60, score: 160, color: '#ffb74d', img: "fruit4.png" },
+            { radius: 75, score: 320, color: '#ef5350', img: "fruit5.png" },
+            { radius: 95, score: 640, color: '#81c784', img: "fruit6.png" }
         ];
 
-        // 벽과 바닥
-        const ground = Bodies.rectangle(200, 590, 400, 20, { isStatic: true, render: { fillStyle: '#fff' } });
-        const leftWall = Bodies.rectangle(5, 300, 10, 600, { isStatic: true, render: { fillStyle: '#fff' } });
-        const rightWall = Bodies.rectangle(395, 300, 10, 600, { isStatic: true, render: { fillStyle: '#fff' } });
+        let score = 0;
+
+        // 벽 설정 (갈색으로 변경)
+        const ground = Bodies.rectangle(200, 590, 400, 40, { isStatic: true, render: { fillStyle: '#5d4037' } });
+        const leftWall = Bodies.rectangle(5, 300, 10, 600, { isStatic: true, render: { fillStyle: '#5d4037' } });
+        const rightWall = Bodies.rectangle(395, 300, 10, 600, { isStatic: true, render: { fillStyle: '#5d4037' } });
         Composite.add(engine.world, [ground, leftWall, rightWall]);
 
-        // 2. 가이드 기능 (마우스 움직임 추적)
+        const gameContainer = document.getElementById('game-container');
+        const guideLine = document.getElementById('guide-line');
+        const bgm = document.getElementById('bgm');
+
         gameContainer.addEventListener("mousemove", (e) => {
-            if (isGameOver) return;
-            const rect = render.canvas.getBoundingClientRect();
+            const rect = gameContainer.getBoundingClientRect();
             let x = e.clientX - rect.left;
-            
-            // X좌표 제한
-            if (x < 30) x = 30; if (x > 370) x = 370;
-
-            // 가이드 라인 위치 변경
+            if (x < 25) x = 25; if (x > 375) x = 375;
             guideLine.style.left = x + 'px';
-            guideLine.style.visibility = 'visible';
-            
-            // 생성될 과일 미리보기 (체리 고정)
-            const nextFruit = FRUITS[0];
-            guideFruitDiv.style.left = x + 'px';
-            guideFruitDiv.style.width = nextFruit.radius * 2 + 'px';
-            guideFruitDiv.style.height = nextFruit.radius * 2 + 'px';
-            guideFruitDiv.style.backgroundColor = nextFruit.color;
-            guideFruitDiv.style.border = `2px solid ${nextFruit.border}`;
-            guideFruitDiv.style.visibility = 'visible';
         });
 
-        // 마우스가 화면 나가면 가이드 숨김
-        gameContainer.addEventListener("mouseleave", () => {
-            guideLine.style.visibility = 'hidden';
-            guideFruitDiv.style.visibility = 'hidden';
-        });
-
-        // 클릭 이벤트 (과일 투하)
-        window.addEventListener("mousedown", (e) => {
-            if (isGameOver) return;
-
-            const rect = render.canvas.getBoundingClientRect();
+        gameContainer.addEventListener("mousedown", (e) => {
+            bgm.play().catch(() => {});
+            const rect = gameContainer.getBoundingClientRect();
             let x = e.clientX - rect.left;
-            if (x < 30) x = 30; if (x > 370) x = 370;
+            if (x < 25) x = 25; if (x > 375) x = 375;
+            addFruit(x, 50, 0);
+        });
 
-            const index = 0; // 지금은 가이드에 맞게 체리만 생성
-            const fruit = FRUITS[index];
-            
-            const newFruit = Bodies.circle(x, 50, fruit.radius, {
+        function addFruit(x, y, index) {
+            const data = FRUITS[index];
+            const fruit = Bodies.circle(x, y, data.radius, {
                 index: index,
                 restitution: 0.3,
-                friction: 0.1,
-                render: {
-                    fillStyle: fruit.color,
-                    strokeStyle: fruit.border, // 테두리 추가
-                    lineWidth: 3
-                }
+                render: { fillStyle: data.color }
             });
-            Composite.add(engine.world, newFruit);
-        });
 
-        // 충돌 및 합체 로직
+            // 이미지 로딩 실패를 대비해 기본 색상은 유지하되, 이미지가 있으면 덮어씌웁니다.
+            if(data.img) {
+                const img = new Image();
+                img.src = data.img;
+                img.onload = () => {
+                    fruit.render.sprite.texture = data.img;
+                    fruit.render.sprite.xScale = (data.radius * 2) / img.width;
+                    fruit.render.sprite.yScale = (data.radius * 2) / img.height;
+                };
+            }
+
+            Composite.add(engine.world, fruit);
+        }
+
         Events.on(engine, 'collisionStart', (event) => {
-            event.pairs.forEach((collision) => {
-                const { bodyA, bodyB } = collision;
-
-                // 같은 레벨의 과일이 부딪혔는지 확인
+            event.pairs.forEach((pair) => {
+                const { bodyA, bodyB } = pair;
                 if (bodyA.index === bodyB.index && bodyA.index !== undefined && bodyA.index < FRUITS.length - 1) {
-                    const nextIndex = bodyA.index + 1;
-                    const nextFruit = FRUITS[nextIndex];
+                    const nextIdx = bodyA.index + 1;
                     const midX = (bodyA.position.x + bodyB.position.x) / 2;
                     const midY = (bodyA.position.y + bodyB.position.y) / 2;
 
                     Composite.remove(engine.world, [bodyA, bodyB]);
-
-                    // 점수 올리기
-                    score += FRUITS[nextIndex].score;
-                    document.getElementById('score').innerText = `Score: ${score}`;
-
-                    // 다음 레벨 과일 생성
-                    const newFruit = Bodies.circle(midX, midY, nextFruit.radius, {
-                        index: nextIndex,
-                        render: {
-                            fillStyle: nextFruit.color,
-                            strokeStyle: nextFruit.border,
-                            lineWidth: 3
-                        }
-                    });
-                    Composite.add(engine.world, newFruit);
+                    addFruit(midX, midY, nextIdx);
+                    
+                    score += FRUITS[nextIdx].score;
+                    document.getElementById('score').innerText = score;
                 }
             });
         });
-
-        // 게임 오버 체크
-        Events.on(engine, 'afterUpdate', () => {
-            if (isGameOver) return;
-
-            Composite.allBodies(engine.world).forEach(body => {
-                if (!body.isStatic && body.position.y < 100 && body.velocity.y < 0.1) {
-                    isGameOver = true;
-                    // 가이드 숨김
-                    guideLine.style.visibility = 'hidden';
-                    guideFruitDiv.style.visibility = 'hidden';
-                    alert(`게임 오버! 최종 점수: ${score}`);
-                    location.reload();
-                }
-            });
-        });
-
-        Render.run(render);
-        Runner.run(Runner.create(), engine);
     </script>
 </body>
 </html>
